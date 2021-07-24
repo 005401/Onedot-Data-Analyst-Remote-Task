@@ -19,8 +19,12 @@ df = df.sort_values("ID")
 
 # Some rows in the input data have repeting ID and column values, while only the Attribute Names and Attribute Values change.
 # We can group them and then make new columns with all Attribute Names and Attribute Values in single row for each ID
-df_grp = df.groupby(["ID", "MakeText", "TypeName", "TypeNameFull", "ModelText", "ModelTypeText"])
+df_grp = df.groupby(["ID", "MakeText", "TypeName", "TypeNameFull", "ModelText", "ModelTypeText"], dropna=False)
 df_grp_agg = df_grp.agg({"Attribute Names": list, "Attribute Values": list}).reset_index()
+
+# some ModelText vaues are NaN due to dropna=False above
+# the line below helps with normalization later
+df_grp_agg['ModelText'] = df_grp_agg['ModelText'].astype('str')
 
 # define function to aggragate attributes
 def aggr_attr(row):
@@ -36,7 +40,7 @@ df_grp_agg_attr = df_grp_agg.apply(aggr_attr, axis=1)
 # Normalisation is required in case an attribute value is different but actually is the same (different
 # spelling, language, different unit used etc.).
 # 
-# E.g. the first column in the target data "carType" defines cat Types (	Coupé	Convertible / Roadster	Other etc.)
+# E.g. the first column in the target data "carType" defines car body Types (Coupé	Convertible / Roadster	Other etc.)
 # The column BodyTypeText in the input data can be used as carTypes for the target data 
 # but it uses slightly different names (some are in German) and some are missgng (e.g. Single seater)
 # We could use the number of seats to find the "Single seater" cars for the target data
@@ -46,7 +50,7 @@ df_grp_agg_attr = df_grp_agg.apply(aggr_attr, axis=1)
 # the names used in Target Data carType column and use the number of seats to find the "Single seater". 
 # If the BodyType in input data can't be assigned to one of the types in target data, put it to "Other"
 def norm_cartype(row):
-    if row["Seats"] == 1:
+    if row["Seats"] == '1':
         return "Single seater"
     try:
         return {
@@ -132,7 +136,7 @@ def integrate(row):
     return pd.Series({
         "carType": row["BodyTypeText"],
         "color": row["BodyColorText"],
-        "condition": row["ConditionTypeText"],
+        "condition": row["Condition"],
         "currency": "CHF", # assume that all cars are from/to be sold CH
         "drive": "LHD", # all cars in the input data are from CH, hence LHD, could not find column to normalize
         "city": row["City"], # all cities are from CH
